@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { interpretSaju } from './gemini'
-import { supabase } from './supabase'
+import { isSupabaseConfigured, supabase } from './supabase'
 import './App.css'
 
 function getKoreanAge(birthDate) {
@@ -72,6 +72,8 @@ function App() {
   }, [])
 
   async function loadReadings() {
+    if (!supabase) return
+
     const { data, error: fetchError } = await supabase
       .from('saju_readings')
       .select('id, name, birth_date, birth_time, gender, calendar_type, age, result, created_at')
@@ -108,6 +110,12 @@ function App() {
         calendarType,
         age,
       })
+
+      if (!supabase) {
+        setResult(text)
+        setSelectedReading({ name, birth_date: birthDate, birth_time: birthTime, gender, calendar_type: calendarType, age, result: text })
+        return
+      }
 
       const { data, error: insertError } = await supabase
         .from('saju_readings')
@@ -157,7 +165,11 @@ function App() {
         <p className="sidebar-label">Saved</p>
         <h2 className="sidebar-title">기록</h2>
         {readings.length === 0 ? (
-          <p className="sidebar-empty">아직 저장된 이름이 없습니다.</p>
+          <p className="sidebar-empty">
+            {isSupabaseConfigured
+              ? '아직 저장된 이름이 없습니다.'
+              : 'Supabase 환경변수가 없어 기록을 불러올 수 없습니다.'}
+          </p>
         ) : (
           <ul className="reading-list">
             {readings.map((reading) => (
