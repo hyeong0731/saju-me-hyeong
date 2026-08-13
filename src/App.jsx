@@ -218,6 +218,61 @@ function EditReadingForm({ reading, onCancel, onSave, saving, error }) {
   )
 }
 
+function LoginView({ onSignIn, signingIn, error }) {
+  return (
+    <div className="layout layout-auth">
+      <div className="page page-auth">
+        <header className="hero">
+          <p className="brand">saju-me</p>
+          <h1>당신의 사주를 읽어 드립니다</h1>
+          <p className="lede">Google 계정으로 로그인하면 사주 기록을 저장하고 다시 볼 수 있습니다.</p>
+        </header>
+
+        <main className="main">
+          <button type="button" className="google-signin" onClick={onSignIn} disabled={signingIn}>
+            <span className="google-signin-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 48 48" fill="none">
+                <path
+                  fill="#EA4335"
+                  d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+                />
+                <path
+                  fill="#4285F4"
+                  d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.59 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+                />
+              </svg>
+            </span>
+            <span>{signingIn ? '로그인 중' : 'Google로 로그인'}</span>
+            {signingIn && <span className="submit-dots" aria-hidden="true" />}
+          </button>
+          {error && <p className="error">{error}</p>}
+        </main>
+      </div>
+    </div>
+  )
+}
+
+function AuthBar({ user, onSignOut, signingOut }) {
+  const label = user.user_metadata?.full_name || user.email || '사용자'
+
+  return (
+    <div className="auth-bar">
+      <span className="auth-user">{label}</span>
+      <button type="button" className="auth-signout" onClick={onSignOut} disabled={signingOut}>
+        {signingOut ? '로그아웃 중' : '로그아웃'}
+      </button>
+    </div>
+  )
+}
+
 function App() {
   const [name, setName] = useState('')
   const [birthDate, setBirthDate] = useState('')
@@ -234,9 +289,105 @@ function App() {
   const [selectedReading, setSelectedReading] = useState(null)
   const [isEditing, setIsEditing] = useState(false)
 
+  const [user, setUser] = useState(null)
+  const [authReady, setAuthReady] = useState(!isSupabaseConfigured)
+  const [signingIn, setSigningIn] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
+
   useEffect(() => {
-    loadReadings()
+    try {
+      const params = new URLSearchParams(window.location.search)
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+      const authError = params.get('error') || hashParams.get('error')
+      const authErrorDescription =
+        params.get('error_description') || hashParams.get('error_description')
+
+      if (authError) {
+        setError(
+          decodeURIComponent(authErrorDescription || authError).replace(/\+/g, ' '),
+        )
+      }
+    } catch {
+      // ignore malformed callback URLs
+    }
   }, [])
+
+  useEffect(() => {
+    if (!supabase) return undefined
+
+    let cancelled = false
+
+    function applySession(session) {
+      if (cancelled) return
+      setUser(session?.user ?? null)
+      setAuthReady(true)
+    }
+
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => applySession(session))
+      .catch(() => applySession(null))
+
+    const timeoutId = window.setTimeout(() => {
+      if (!cancelled) setAuthReady(true)
+    }, 4000)
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      applySession(session)
+    })
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timeoutId)
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (user) {
+      loadReadings()
+    } else {
+      setReadings([])
+    }
+  }, [user])
+
+  async function signInWithGoogle() {
+    if (!supabase) return
+
+    setSigningIn(true)
+    setError('')
+
+    const { error: signInError } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin,
+      },
+    })
+
+    if (signInError) {
+      setError(signInError.message)
+      setSigningIn(false)
+    }
+  }
+
+  async function signOut() {
+    if (!supabase) return
+
+    setSigningOut(true)
+    setError('')
+
+    const { error: signOutError } = await supabase.auth.signOut()
+
+    if (signOutError) {
+      setError(signOutError.message)
+    } else {
+      handleCloseResult()
+    }
+
+    setSigningOut(false)
+  }
 
   async function loadReadings() {
     if (!supabase) return
@@ -303,6 +454,7 @@ function App() {
           calendar_type: calendarType,
           age,
           result: text,
+          user_id: user.id,
         })
         .select(READING_FIELDS)
         .single()
@@ -409,6 +561,10 @@ function App() {
 
   const showResultPanel = result || isEditing
 
+  if (isSupabaseConfigured && (!authReady || !user)) {
+    return <LoginView onSignIn={signInWithGoogle} signingIn={signingIn} error={error} />
+  }
+
   return (
     <div className="layout">
       <aside className="sidebar" aria-label="저장된 사주">
@@ -438,6 +594,7 @@ function App() {
       </aside>
 
       <div className="page">
+        {user && <AuthBar user={user} onSignOut={signOut} signingOut={signingOut} />}
         {showResultPanel ? (
           <div id="saju-result">
             <header className="hero hero-compact">
