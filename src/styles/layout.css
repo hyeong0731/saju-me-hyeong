@@ -13,6 +13,7 @@
   align-self: start;
   padding-right: 1.5rem;
   border-right: 1px solid var(--line);
+  overflow: visible;
   animation: rise 0.7s ease both;
 }
 

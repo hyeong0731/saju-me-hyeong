@@ -1,5 +1,5 @@
 import { formatBirthMeta } from '../../lib/profile'
-import { localizeReadingGender } from '../../lib/readings'
+import { formatReadingText } from '../../lib/readings'
 import { supabase } from '../../lib/supabase'
 
 export function ResultView({
@@ -14,7 +14,7 @@ export function ResultView({
   shareMessage,
   isShared = false,
 }) {
-  const paragraphs = localizeReadingGender(text)
+  const paragraphs = formatReadingText(text)
     .split(/\n\s*\n/)
     .map((p) => p.trim())
     .filter(Boolean)

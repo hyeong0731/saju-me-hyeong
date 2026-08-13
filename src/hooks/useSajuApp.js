@@ -7,7 +7,7 @@ import {
   profileFromRow,
   profileToReadingSnapshot,
 } from '../lib/profile'
-import { flattenReading, READING_SELECT, USER_FIELDS } from '../lib/readings'
+import { flattenReading, formatReadingText, READING_SELECT, USER_FIELDS } from '../lib/readings'
 import {
   clearShareParamFromUrl,
   getShareTokenFromLocation,
@@ -124,10 +124,10 @@ export function useSajuApp() {
     return () => window.clearTimeout(timeoutId)
   }, [shareMessage])
 
-  async function signInWithGoogle() {
+  async function signInWithGoogle({ switchAccount = false } = {}) {
     setError('')
-    trackLogin()
-    const message = await auth.signInWithGoogle()
+    trackLogin(switchAccount ? { switch_account: true } : {})
+    const message = await auth.signInWithGoogle({ switchAccount })
     if (message) setError(message)
   }
 
@@ -264,14 +264,16 @@ export function useSajuApp() {
 
     try {
       const age = getKoreanAge(profile.birthDate)
-      const text = await interpretSaju({
-        name: profile.name,
-        birthDate: profile.birthDate,
-        birthTime: profile.birthTime,
-        gender: profile.gender,
-        calendarType: profile.calendarType,
-        age,
-      })
+      const text = formatReadingText(
+        await interpretSaju({
+          name: profile.name,
+          birthDate: profile.birthDate,
+          birthTime: profile.birthTime,
+          gender: profile.gender,
+          calendarType: profile.calendarType,
+          age,
+        }),
+      )
 
       const snapshot = profileToReadingSnapshot(profile)
 

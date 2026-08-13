@@ -31,6 +31,32 @@ export function localizeReadingGender(text) {
     .replace(/성별\s*:\s*female(?:\s*\(\s*여성\s*\))?/gi, '성별: 여')
 }
 
+export function stripMarkdown(text) {
+  if (!text) return ''
+  return String(text)
+    .replace(/\r\n/g, '\n')
+    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+    .replace(/^\s{0,3}>\s?/gm, '')
+    .replace(/^\s{0,3}(?:-{3,}|\*{3,}|_{3,})\s*$/gm, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/`{1,3}([^`]+)`{1,3}/g, '$1')
+    .replace(/\*\*\*(.+?)\*\*\*/g, '$1')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/__(.+?)__/g, '$1')
+    .replace(/(^|[\s(（])\*([^*\n]+?)\*(?=[\s.,!?。，、)）]|$)/g, '$1$2')
+    .replace(/(^|[\s(（])_([^_\n]+?)_(?=[\s.,!?。，、)）]|$)/g, '$1$2')
+    .replace(/^\s{0,3}[-*+]\s+/gm, '')
+    .replace(/^\s{0,3}\d+[.)]\s+/gm, '')
+    .replace(/[*#]{1,6}/g, '')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+export function formatReadingText(text) {
+  return stripMarkdown(localizeReadingGender(text))
+}
+
 export function formatReadingDate(iso) {
   if (!iso) return '해석'
   return new Date(iso).toLocaleString('ko-KR', {

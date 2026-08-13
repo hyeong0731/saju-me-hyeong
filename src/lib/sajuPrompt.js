@@ -72,6 +72,7 @@ return only Korean.
 
 위 예시는 형식일 뿐이며, 예시 명식을 그대로 해석하지 마세요. 반드시 사용자가 입력한 생년월일·시간·성별·양력/음력으로 명식을 다시 세우세요.
 한국어로만 답하세요.
+마크다운을 쓰지 마세요. **, ##, -, 1. 같은 기호로 소제목을 만들지 말고, 사람이 쓴 글처럼 문단으로만 이어 쓰세요.
 `.trim()
 
 export function buildSajuUserPrompt({
@@ -95,6 +96,7 @@ export function buildSajuUserPrompt({
 태어난 시간: ${birthTime}
 
 해석문에도 성별은 남 또는 여로만 적으세요. male, female은 쓰지 마세요.
+**, ## 같은 마크다운은 쓰지 말고 일반 문단으로만 쓰세요.
 return only Korean.
 `.trim()
 }

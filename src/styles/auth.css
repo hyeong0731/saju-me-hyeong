@@ -88,6 +88,30 @@
   flex-shrink: 0;
 }
 
+.google-signin-switch {
+  display: block;
+  width: 100%;
+  margin-top: 0.9rem;
+  padding: 0;
+  color: var(--ink-muted);
+  font-size: 0.82rem;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.google-signin-switch:hover:not(:disabled) {
+  color: var(--ink);
+}
+
+.google-signin-switch:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .auth-actions {
   display: flex;
   align-items: baseline;

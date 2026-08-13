@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { localizeReadingGender } from '../../lib/readings'
+import { formatReadingText } from '../../lib/readings'
 
 export function EditReadingForm({ reading, onCancel, onSave, saving, error }) {
-  const [resultText, setResultText] = useState(localizeReadingGender(reading.result ?? ''))
+  const [resultText, setResultText] = useState(formatReadingText(reading.result ?? ''))
 
   async function handleSubmit(e) {
     e.preventDefault()

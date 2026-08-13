@@ -61,8 +61,8 @@ export function getAnalyticsScreen({
   return { path: '/', title: '사주 보기' }
 }
 
-export function trackLogin() {
-  trackEvent('login', { method: 'google' })
+export function trackLogin(params = {}) {
+  trackEvent('login', { method: 'google', ...params })
 }
 
 export function trackLogout() {

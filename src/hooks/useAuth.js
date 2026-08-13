@@ -56,7 +56,7 @@ export function useAuth() {
     }
   }, [])
 
-  async function signInWithGoogle() {
+  async function signInWithGoogle({ switchAccount = false } = {}) {
     if (!supabase) return ''
 
     setSigningIn(true)
@@ -65,6 +65,7 @@ export function useAuth() {
       provider: 'google',
       options: {
         redirectTo: window.location.origin,
+        ...(switchAccount ? { queryParams: { prompt: 'select_account' } } : {}),
       },
     })
 

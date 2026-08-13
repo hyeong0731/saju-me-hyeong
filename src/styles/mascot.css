@@ -28,9 +28,12 @@
 }
 
 .mascot-empty {
-  width: 2.6rem;
+  width: 3.6rem;
   height: auto;
   margin: 0 0 0.65rem;
+  object-fit: contain;
+  object-position: center;
+  overflow: visible;
   opacity: 0.95;
 }
 
@@ -46,6 +49,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  overflow: visible;
 }
 
 .reading-wait {

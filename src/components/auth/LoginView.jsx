@@ -18,7 +18,7 @@ export function LoginView({ onSignIn, signingIn, error }) {
             type="button"
             className="google-signin"
             data-analytics="login"
-            onClick={onSignIn}
+            onClick={() => onSignIn()}
             disabled={signingIn}
           >
             <span className="google-signin-icon" aria-hidden="true">
@@ -26,6 +26,15 @@ export function LoginView({ onSignIn, signingIn, error }) {
             </span>
             <span>{signingIn ? '로그인 중' : 'Google로 로그인'}</span>
             {signingIn && <span className="submit-dots" aria-hidden="true" />}
+          </button>
+          <button
+            type="button"
+            className="google-signin-switch"
+            data-analytics="login_switch_account"
+            onClick={() => onSignIn({ switchAccount: true })}
+            disabled={signingIn}
+          >
+            다른 계정으로 로그인
           </button>
           {error && <p className="error">{error}</p>}
         </main>
