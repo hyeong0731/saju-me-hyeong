@@ -1,3 +1,35 @@
+@font-face {
+  font-family: 'MaruBuri';
+  src: url('https://hangeul.pstatic.net/hangeul_static/webfont/MaruBuri/MaruBuri-Light.woff2')
+    format('woff2');
+  font-weight: 300;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'MaruBuri';
+  src: url('https://hangeul.pstatic.net/hangeul_static/webfont/MaruBuri/MaruBuri-Regular.woff2')
+    format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'MaruBuri';
+  src: url('https://hangeul.pstatic.net/hangeul_static/webfont/MaruBuri/MaruBuri-SemiBold.woff2')
+    format('woff2');
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'MaruBuri';
+  src: url('https://hangeul.pstatic.net/hangeul_static/webfont/MaruBuri/MaruBuri-Bold.woff2')
+    format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+
 *,
 *::before,
 *::after {
@@ -7,13 +39,21 @@
 :root {
   --bg: #f4f4f2;
   --bg-soft: #ececeb;
-  --ink: #0a0a0a;
-  --ink-muted: #6b6b6b;
-  --line: #d6d6d4;
-  --line-strong: #0a0a0a;
+  --ink: #171717;
+  --ink-muted: #737373;
+  --line: #e4e4e4;
+  --line-strong: #171717;
   --surface: #ffffff;
-  --font-display: 'Instrument Serif', 'Times New Roman', serif;
-  --font-body: 'Outfit', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  --accent: #171717;
+  --accent-deep: #171717;
+  --accent-soft: #f0f0ee;
+  --danger: #8a3a3a;
+  --placeholder: #b0b0ae;
+  --radius: 1.35rem;
+  --radius-sm: 0.95rem;
+  --radius-pill: 999px;
+  --font-display: 'MaruBuri', 'Times New Roman', serif;
+  --font-body: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
 }
 
 html {

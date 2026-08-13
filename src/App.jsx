@@ -1,7 +1,20 @@
 import { useEffect, useState } from 'react'
 import { interpretSaju } from './gemini'
 import { isSupabaseConfigured, supabase } from './supabase'
+import mascotMain from './assets/mascot/main.png'
+import mascotSmile from './assets/mascot/smile.png'
+import mascotThink from './assets/mascot/think.png'
+import mascotAnalyze from './assets/mascot/analyze.png'
 import './App.css'
+
+function Brand({ withFace = false }) {
+  return (
+    <p className={`brand ${withFace ? 'brand-row' : ''}`}>
+      {withFace && <img src={mascotSmile} alt="" className="mascot mascot-brand" />}
+      saju-me
+    </p>
+  )
+}
 
 const USER_FIELDS = 'name, birth_date, birth_time, gender, calendar_type'
 const READING_SELECT =
@@ -207,6 +220,7 @@ function OnboardingModal({ initialName, onSave, saving, error }) {
         aria-modal="true"
         aria-labelledby="onboarding-title"
       >
+        <img src={mascotThink} alt="" className="mascot mascot-modal" />
         <p className="modal-kicker">Welcome</p>
         <h2 id="onboarding-title" className="modal-title">
           생시 정보를 알려 주세요
@@ -355,7 +369,8 @@ function LoginView({ onSignIn, signingIn, error }) {
     <div className="layout layout-auth">
       <div className="page page-auth">
         <header className="hero">
-          <p className="brand">saju-me</p>
+          <img src={mascotMain} alt="" className="mascot mascot-welcome" />
+          <Brand />
           <h1>당신의 사주를 읽어 드립니다</h1>
           <p className="lede">Google 계정으로 로그인하면 사주 기록을 저장하고 다시 볼 수 있습니다.</p>
         </header>
@@ -833,11 +848,14 @@ function App() {
         <p className="sidebar-label">Saved</p>
         <h2 className="sidebar-title">기록</h2>
         {readings.length === 0 ? (
-          <p className="sidebar-empty">
-            {isSupabaseConfigured
-              ? '아직 저장된 해석이 없습니다.'
-              : 'Supabase 환경변수가 없어 기록을 불러올 수 없습니다.'}
-          </p>
+          <div className="sidebar-empty-wrap">
+            <img src={mascotThink} alt="" className="mascot mascot-empty" />
+            <p className="sidebar-empty">
+              {isSupabaseConfigured
+                ? '아직 저장된 해석이 없습니다.'
+                : 'Supabase 환경변수가 없어 기록을 불러올 수 없습니다.'}
+            </p>
+          </div>
         ) : (
           <ul className="reading-list">
             {readings.map((reading) => (
@@ -888,7 +906,7 @@ function App() {
         ) : showResultPanel ? (
           <div id="saju-result">
             <header className="hero hero-compact">
-              <p className="brand">saju-me</p>
+              <Brand withFace />
             </header>
             {isEditing && selectedReading ? (
               <EditReadingForm
@@ -918,7 +936,7 @@ function App() {
         ) : (
           <>
             <header className="hero">
-              <p className="brand">saju-me</p>
+              <Brand withFace />
               <h1>{profile.name ? `${profile.name}님의 사주` : '당신의 사주를 읽어 드립니다'}</h1>
               <p className="lede">저장된 생시로 해석합니다. 정보가 바뀌면 프로필에서 수정해 주세요.</p>
             </header>
@@ -943,6 +961,11 @@ function App() {
               )}
 
               <form className="form" onSubmit={handleSubmit}>
+                {loading && (
+                  <div className="reading-wait" aria-hidden="true">
+                    <img src={mascotAnalyze} alt="" className="mascot mascot-loading" />
+                  </div>
+                )}
                 <button type="submit" className="submit" disabled={loading || !hasProfile}>
                   <span>{loading ? '해석 중' : '사주 보기'}</span>
                   {loading && <span className="submit-dots" aria-hidden="true" />}
