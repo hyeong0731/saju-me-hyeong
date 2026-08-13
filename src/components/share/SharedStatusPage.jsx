@@ -1,5 +1,6 @@
 import { mascotAnalyze, mascotThink } from '../../assets/mascot'
 import { Brand } from '../Brand'
+import { ShareInvite } from './ShareInvite'
 
 export function SharedStatusPage({ status, onExit }) {
   const isLoading = status === 'loading'
@@ -23,13 +24,7 @@ export function SharedStatusPage({ status, onExit }) {
             </>
           )}
         </header>
-        {!isLoading && (
-          <main className="main">
-            <button type="button" className="submit" data-analytics="click_share_cta" onClick={onExit}>
-              내 사주 보러 가기
-            </button>
-          </main>
-        )}
+        {!isLoading && <ShareInvite user={false} onExit={onExit} />}
       </div>
     </div>
   )

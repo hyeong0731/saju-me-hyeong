@@ -53,8 +53,40 @@ export function stripMarkdown(text) {
     .trim()
 }
 
+function isClosingQuestion(paragraph) {
+  const trimmed = paragraph.trim()
+  if (!trimmed) return true
+
+  const asksFollowUp =
+    /(궁금|더 알고|알려\s*드|다음에|무엇이|어떤 점|어떤 부분|질문|연애운도|재물운도|직업운도)/.test(
+      trimmed,
+    ) && /[?？]/.test(trimmed)
+
+  if (asksFollowUp) return true
+
+  const sentences = trimmed
+    .split(/(?<=[.。!！?？])/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean)
+
+  return sentences.length > 0 && sentences.every((sentence) => /[?？]\s*$/.test(sentence))
+}
+
+export function stripTrailingQuestions(text) {
+  if (!text) return ''
+  const parts = String(text)
+    .trim()
+    .split(/\n\s*\n/)
+
+  while (parts.length > 1 && isClosingQuestion(parts[parts.length - 1])) {
+    parts.pop()
+  }
+
+  return parts.join('\n\n').trim()
+}
+
 export function formatReadingText(text) {
-  return stripMarkdown(localizeReadingGender(text))
+  return stripTrailingQuestions(stripMarkdown(localizeReadingGender(text)))
 }
 
 export function formatReadingDate(iso) {
