@@ -1,0 +1,69 @@
+.mascot {
+  display: block;
+  user-select: none;
+  pointer-events: none;
+}
+
+.mascot-welcome {
+  width: min(38%, 138px);
+  height: auto;
+  margin: 0 0 1.35rem;
+  animation: mascot-float 5.2s ease-in-out infinite;
+}
+
+.mascot-brand {
+  width: 2rem;
+  height: auto;
+  flex-shrink: 0;
+}
+
+.hero-compact .mascot-brand {
+  width: 1.65rem;
+}
+
+.mascot-modal {
+  width: 3.25rem;
+  height: auto;
+  margin: 0 0 0.85rem;
+}
+
+.mascot-empty {
+  width: 2.6rem;
+  height: auto;
+  margin: 0 0 0.65rem;
+  opacity: 0.95;
+}
+
+.mascot-loading {
+  width: 4.5rem;
+  height: auto;
+  margin: 0 auto;
+}
+
+.sidebar-empty-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.reading-wait {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.15rem;
+}
+
+@keyframes mascot-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mascot-welcome {
+    animation: none;
+  }
+}
