@@ -26,7 +26,8 @@ export function ReadingSidebar({ readings, selectedReadingId, onSelect }) {
                 data-analytics="select_reading"
                 onClick={() => onSelect(reading)}
               >
-                {formatReadingDate(reading.created_at)}
+                <span className="reading-item-name">{reading.name || '사주 해석'}</span>
+                <span className="reading-item-date">{formatReadingDate(reading.created_at)}</span>
               </button>
             </li>
           ))}

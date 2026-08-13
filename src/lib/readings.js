@@ -24,6 +24,13 @@ export function flattenReading(row, fallback = {}) {
   }
 }
 
+export function localizeReadingGender(text) {
+  if (!text) return ''
+  return String(text)
+    .replace(/성별\s*:\s*male(?:\s*\(\s*남성\s*\))?/gi, '성별: 남')
+    .replace(/성별\s*:\s*female(?:\s*\(\s*여성\s*\))?/gi, '성별: 여')
+}
+
 export function formatReadingDate(iso) {
   if (!iso) return '해석'
   return new Date(iso).toLocaleString('ko-KR', {

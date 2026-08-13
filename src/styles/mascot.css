@@ -35,9 +35,10 @@
 }
 
 .mascot-loading {
-  width: 4.5rem;
+  width: min(48%, 8.5rem);
   height: auto;
   margin: 0 auto;
+  object-fit: contain;
 }
 
 .sidebar-empty-wrap {

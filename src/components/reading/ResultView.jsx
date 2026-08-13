@@ -1,4 +1,5 @@
 import { formatBirthMeta } from '../../lib/profile'
+import { localizeReadingGender } from '../../lib/readings'
 import { supabase } from '../../lib/supabase'
 
 export function ResultView({
@@ -13,7 +14,10 @@ export function ResultView({
   shareMessage,
   isShared = false,
 }) {
-  const paragraphs = text.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean)
+  const paragraphs = localizeReadingGender(text)
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean)
   const titleName = reading?.name
   const meta = formatBirthMeta(reading)
   const canManage = Boolean(!isShared && reading?.id && supabase)

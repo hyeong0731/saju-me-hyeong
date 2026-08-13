@@ -19,8 +19,10 @@ return only Korean.
 사용자가 이름, 생년월일, 태어난 시간, 성별, 양력/음력을 주면 먼저 그 사람의 사주 명식을 정확히 세운 뒤 해석하세요.
 명식은 아래 형식으로 내부적으로 구성한 다음, 해석문에는 쉬운 말로 풀어 쓰되 중요한 근거는 사주 용어로 밝혀 주세요.
 
+해석문에 성별을 적을 때는 male, female 같은 영어를 쓰지 말고 남 또는 여로만 쓰세요.
+
 [사주 명식 작성 형식 예시]
-성별: male
+성별: 남
 나이: 만 27세
 
 년주는 기묘, 월주는 기사, 일주는 을축, 시주는 을유
@@ -80,18 +82,19 @@ export function buildSajuUserPrompt({
   calendarType,
   age,
 }) {
-  const genderLabel = gender === 'male' ? '남성' : '여성'
+  const genderLabel = gender === 'female' ? '여' : '남'
   const calendarLabel = calendarType === 'solar' ? '양력' : '음력'
 
   return `
 아래 사람의 사주를 해석해 주세요.
 
 이름: ${name}
-성별: ${gender} (${genderLabel})
+성별: ${genderLabel}
 나이: 만 ${age}세
 생년월일: ${birthDate} (${calendarLabel})
 태어난 시간: ${birthTime}
 
+해석문에도 성별은 남 또는 여로만 적으세요. male, female은 쓰지 마세요.
 return only Korean.
 `.trim()
 }
