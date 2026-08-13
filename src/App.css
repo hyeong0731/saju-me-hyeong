@@ -471,6 +471,25 @@
   border-bottom-color: var(--ink);
 }
 
+.share-toast {
+  margin: 0 0 0.85rem;
+  color: var(--ink-muted);
+  font-size: 0.82rem;
+  font-weight: 300;
+}
+
+.share-cta {
+  margin-top: 2rem;
+}
+
+.share-cta-lede {
+  margin: 0 0 1rem;
+  color: var(--ink-muted);
+  font-size: 0.92rem;
+  font-weight: 300;
+  line-height: 1.55;
+}
+
 .result-title {
   margin: 0 0 0.75rem;
   font-family: var(--font-display);

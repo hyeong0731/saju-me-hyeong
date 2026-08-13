@@ -18,7 +18,30 @@ function Brand({ withFace = false }) {
 
 const USER_FIELDS = 'name, birth_date, birth_time, gender, calendar_type'
 const READING_SELECT =
-  'id, result, created_at, user_id, users ( name, birth_date, birth_time, gender, calendar_type )'
+  'id, result, created_at, user_id, share_token, users ( name, birth_date, birth_time, gender, calendar_type )'
+const SHARE_TOKEN_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function getShareTokenFromLocation() {
+  try {
+    const token = new URLSearchParams(window.location.search).get('share')
+    if (!token || !SHARE_TOKEN_RE.test(token)) return null
+    return token
+  } catch {
+    return null
+  }
+}
+
+function clearShareParamFromUrl() {
+  const url = new URL(window.location.href)
+  if (!url.searchParams.has('share')) return
+  url.searchParams.delete('share')
+  window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
+}
+
+function shareUrlForToken(token) {
+  return `${window.location.origin}/?share=${token}`
+}
 
 function getKoreanAge(birthDate) {
   const birth = new Date(birthDate)
@@ -41,6 +64,7 @@ function flattenReading(row, fallback = {}) {
     result: row?.result ?? '',
     created_at: row?.created_at,
     user_id: row?.user_id,
+    share_token: row?.share_token ?? fallback.share_token ?? null,
     name: profile.name ?? fallback.name ?? '',
     birth_date: birthDate,
     birth_time: profile.birth_time ?? fallback.birth_time ?? '',
@@ -274,17 +298,34 @@ function ProfileView({ profile, onCancel, onSave, saving, error }) {
   )
 }
 
-function ResultView({ reading, text, onClose, onEdit, onDelete, deleting }) {
+function ResultView({
+  reading,
+  text,
+  onClose,
+  onEdit,
+  onDelete,
+  deleting,
+  onShare,
+  sharing,
+  shareMessage,
+  isShared = false,
+}) {
   const paragraphs = text.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean)
   const titleName = reading?.name
   const meta = formatBirthMeta(reading)
-  const canManage = Boolean(reading?.id && supabase)
+  const canManage = Boolean(!isShared && reading?.id && supabase)
+  const canShare = Boolean(canManage && onShare)
 
   return (
     <article className="result">
       <div className="result-header">
-        <p className="result-kicker">Interpretation</p>
+        <p className="result-kicker">{isShared ? 'Shared' : 'Interpretation'}</p>
         <div className="result-actions">
+          {canShare && (
+            <button type="button" className="result-action" onClick={onShare} disabled={sharing}>
+              {sharing ? '공유 준비 중' : '공유하기'}
+            </button>
+          )}
           {canManage && (
             <>
               <button type="button" className="result-action" onClick={onEdit}>
@@ -307,6 +348,7 @@ function ResultView({ reading, text, onClose, onEdit, onDelete, deleting }) {
           )}
         </div>
       </div>
+      {shareMessage && <p className="share-toast">{shareMessage}</p>}
       <h2 className="result-title">{titleName || '사주 해석'}</h2>
       {meta && <p className="result-meta">{meta}</p>}
       <div className="result-divider" aria-hidden="true" />
@@ -318,6 +360,63 @@ function ResultView({ reading, text, onClose, onEdit, onDelete, deleting }) {
         ))}
       </div>
     </article>
+  )
+}
+
+function SharedStatusPage({ status, onExit }) {
+  const isLoading = status === 'loading'
+
+  return (
+    <div className="layout layout-auth">
+      <div className="page page-auth">
+        <header className="hero">
+          <img
+            src={isLoading ? mascotAnalyze : mascotThink}
+            alt=""
+            className={`mascot ${isLoading ? 'mascot-loading' : 'mascot-welcome'}`}
+          />
+          <Brand />
+          {isLoading ? (
+            <p className="lede">공유된 사주를 불러오는 중</p>
+          ) : (
+            <>
+              <h1>공유 링크를 찾을 수 없습니다</h1>
+              <p className="lede">링크가 잘못되었거나 해석이 삭제되었을 수 있습니다.</p>
+            </>
+          )}
+        </header>
+        {!isLoading && (
+          <main className="main">
+            <button type="button" className="submit" onClick={onExit}>
+              내 사주 보러 가기
+            </button>
+          </main>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function SharedReadingPage({ reading, text, user, onExit }) {
+  return (
+    <div className="layout layout-auth">
+      <div className="page page-auth">
+        <header className="hero hero-compact">
+          <Brand withFace />
+        </header>
+        <ResultView reading={reading} text={text} isShared />
+        <div className="share-cta">
+          <p className="share-cta-lede">
+            {user
+              ? '내 사주 기록으로 돌아가려면 아래 버튼을 눌러 주세요.'
+              : '내 사주도 궁금하다면 로그인하고 해석을 받아 보세요.'}
+          </p>
+          <button type="button" className="submit" onClick={onExit}>
+            {user ? '내 사주로 돌아가기' : '내 사주 보러 가기'}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -445,6 +544,11 @@ function App() {
   const [authReady, setAuthReady] = useState(!isSupabaseConfigured)
   const [signingIn, setSigningIn] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
+  const [shareStatus, setShareStatus] = useState(() =>
+    getShareTokenFromLocation() ? 'loading' : 'idle',
+  )
+  const [sharing, setSharing] = useState(false)
+  const [shareMessage, setShareMessage] = useState('')
 
   useEffect(() => {
     try {
@@ -511,14 +615,59 @@ function App() {
   }, [user])
 
   useEffect(() => {
-    const shouldLock = Boolean(user && profileChecked && !hasProfile)
+    const shouldLock = Boolean(
+      user && profileChecked && !hasProfile && shareStatus === 'idle',
+    )
     if (!shouldLock) return undefined
     const previous = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => {
       document.body.style.overflow = previous
     }
-  }, [user, profileChecked, hasProfile])
+  }, [user, profileChecked, hasProfile, shareStatus])
+
+  useEffect(() => {
+    const token = getShareTokenFromLocation()
+    if (!token) return undefined
+    if (!supabase) {
+      setShareStatus('not_found')
+      return undefined
+    }
+
+    let cancelled = false
+    setShareStatus('loading')
+
+    supabase
+      .rpc('get_shared_reading', { p_token: token })
+      .then(({ data, error: fetchError }) => {
+        if (cancelled) return
+        const row = Array.isArray(data) ? data[0] : data
+        if (fetchError || !row) {
+          setShareStatus('not_found')
+          return
+        }
+
+        const reading = flattenReading(row, row)
+        setSelectedReading(reading)
+        setResult(row.result ?? '')
+        setIsEditing(false)
+        setIsEditingProfile(false)
+        setShareStatus('ready')
+      })
+      .catch(() => {
+        if (!cancelled) setShareStatus('not_found')
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!shareMessage) return undefined
+    const timeoutId = window.setTimeout(() => setShareMessage(''), 5000)
+    return () => window.clearTimeout(timeoutId)
+  }, [shareMessage])
 
   async function signInWithGoogle() {
     if (!supabase) return
@@ -801,6 +950,62 @@ function App() {
     }
   }
 
+  function handleExitShare() {
+    clearShareParamFromUrl()
+    setShareStatus('idle')
+    setShareMessage('')
+    handleCloseResult()
+  }
+
+  async function handleShare() {
+    if (!supabase || !selectedReading?.id) return
+
+    setSharing(true)
+    setShareMessage('')
+    setError('')
+
+    try {
+      const { data: token, error: shareError } = await supabase.rpc('ensure_share_token', {
+        p_reading_id: selectedReading.id,
+      })
+
+      if (shareError || !token) {
+        throw new Error(shareError?.message || '공유 링크를 만들지 못했습니다.')
+      }
+
+      setSelectedReading((prev) => (prev ? { ...prev, share_token: token } : prev))
+      setReadings((prev) =>
+        prev.map((item) => (item.id === selectedReading.id ? { ...item, share_token: token } : item)),
+      )
+
+      const url = shareUrlForToken(token)
+      const title = selectedReading.name ? `${selectedReading.name}님의 사주` : '사주 해석'
+      const text = selectedReading.name
+        ? `${selectedReading.name}님의 사주 해석을 보냈어요.`
+        : '사주 해석을 보냈어요.'
+
+      if (typeof navigator.share === 'function') {
+        try {
+          await navigator.share({ title, text, url })
+          return
+        } catch (err) {
+          if (err?.name === 'AbortError') return
+        }
+      }
+
+      try {
+        await navigator.clipboard.writeText(url)
+        setShareMessage('링크를 복사했어요. 친구에게 보내 주세요.')
+      } catch {
+        setShareMessage(url)
+      }
+    } catch (err) {
+      setError(err.message || '공유 중 오류가 발생했습니다.')
+    } finally {
+      setSharing(false)
+    }
+  }
+
   async function handleDeleteReading() {
     if (!supabase || !selectedReading?.id) return
     if (!window.confirm('이 해석 기록을 삭제할까요?')) return
@@ -837,6 +1042,25 @@ function App() {
     calendar_type: profile.calendarType,
     age: profile.birthDate ? getKoreanAge(profile.birthDate) : null,
   })
+
+  if (shareStatus === 'loading' || shareStatus === 'not_found') {
+    return <SharedStatusPage status={shareStatus} onExit={handleExitShare} />
+  }
+
+  if (shareStatus === 'ready') {
+    if (!selectedReading || !result) {
+      return <SharedStatusPage status="not_found" onExit={handleExitShare} />
+    }
+
+    return (
+      <SharedReadingPage
+        reading={selectedReading}
+        text={result}
+        user={user}
+        onExit={handleExitShare}
+      />
+    )
+  }
 
   if (isSupabaseConfigured && (!authReady || !user)) {
     return <LoginView onSignIn={signInWithGoogle} signingIn={signingIn} error={error} />
@@ -929,6 +1153,9 @@ function App() {
                 onEdit={handleStartEdit}
                 onDelete={handleDeleteReading}
                 deleting={deleting}
+                onShare={handleShare}
+                sharing={sharing}
+                shareMessage={shareMessage}
               />
             )}
             {!isEditing && error && <p className="error">{error}</p>}
