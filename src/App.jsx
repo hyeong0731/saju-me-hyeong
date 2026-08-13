@@ -3,8 +3,9 @@ import { interpretSaju } from './gemini'
 import { isSupabaseConfigured, supabase } from './supabase'
 import './App.css'
 
-const READING_FIELDS =
-  'id, name, birth_date, birth_time, gender, calendar_type, age, result, created_at'
+const USER_FIELDS = 'name, birth_date, birth_time, gender, calendar_type'
+const READING_SELECT =
+  'id, result, created_at, user_id, users ( name, birth_date, birth_time, gender, calendar_type )'
 
 function getKoreanAge(birthDate) {
   const birth = new Date(birthDate)
@@ -15,6 +16,25 @@ function getKoreanAge(birthDate) {
     age -= 1
   }
   return age
+}
+
+function flattenReading(row, fallback = {}) {
+  const nested = row?.users
+  const profile = nested && !Array.isArray(nested) ? nested : fallback
+  const birthDate = profile.birth_date ?? fallback.birth_date ?? ''
+
+  return {
+    id: row?.id,
+    result: row?.result ?? '',
+    created_at: row?.created_at,
+    user_id: row?.user_id,
+    name: profile.name ?? fallback.name ?? '',
+    birth_date: birthDate,
+    birth_time: profile.birth_time ?? fallback.birth_time ?? '',
+    gender: profile.gender ?? fallback.gender ?? '',
+    calendar_type: profile.calendar_type ?? fallback.calendar_type ?? 'solar',
+    age: birthDate ? getKoreanAge(birthDate) : null,
+  }
 }
 
 function formatBirthMeta(reading) {
@@ -28,15 +48,216 @@ function formatBirthMeta(reading) {
   return parts.filter(Boolean).join(' · ')
 }
 
-function toEditForm(reading) {
+function formatReadingDate(iso) {
+  if (!iso) return '해석'
+  return new Date(iso).toLocaleString('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+}
+
+function emptyProfile(overrides = {}) {
   return {
-    name: reading.name ?? '',
-    birthDate: reading.birth_date ?? '',
-    birthTime: String(reading.birth_time ?? '').slice(0, 5),
-    gender: reading.gender ?? '',
-    calendarType: reading.calendar_type ?? 'solar',
-    result: reading.result ?? '',
+    name: '',
+    birthDate: '',
+    birthTime: '',
+    gender: '',
+    calendarType: 'solar',
+    ...overrides,
   }
+}
+
+function isProfileComplete(profile) {
+  return Boolean(
+    profile?.name &&
+      profile?.birthDate &&
+      profile?.birthTime &&
+      profile?.gender &&
+      profile?.calendarType,
+  )
+}
+
+function profileFromRow(data) {
+  return emptyProfile({
+    name: data?.name ?? '',
+    birthDate: data?.birth_date ?? '',
+    birthTime: String(data?.birth_time ?? '').slice(0, 5),
+    gender: data?.gender ?? '',
+    calendarType: data?.calendar_type ?? 'solar',
+  })
+}
+
+function ProfileFields({ form, setForm, idPrefix }) {
+  return (
+    <>
+      <div className="field">
+        <label htmlFor={`${idPrefix}-name`}>이름</label>
+        <input
+          id={`${idPrefix}-name`}
+          type="text"
+          value={form.name}
+          onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+          placeholder="홍길동"
+          autoComplete="name"
+          required
+        />
+      </div>
+
+      <div className="row">
+        <div className="field">
+          <label htmlFor={`${idPrefix}-birthDate`}>생년월일</label>
+          <input
+            id={`${idPrefix}-birthDate`}
+            type="date"
+            value={form.birthDate}
+            onChange={(e) => setForm((prev) => ({ ...prev, birthDate: e.target.value }))}
+            required
+          />
+        </div>
+        <div className="field">
+          <label htmlFor={`${idPrefix}-birthTime`}>태어난 시간</label>
+          <input
+            id={`${idPrefix}-birthTime`}
+            type="time"
+            value={form.birthTime}
+            onChange={(e) => setForm((prev) => ({ ...prev, birthTime: e.target.value }))}
+            required
+          />
+        </div>
+      </div>
+
+      <div className="field">
+        <span className="field-label" id={`${idPrefix}-gender-label`}>
+          성별
+        </span>
+        <div className="segment" role="group" aria-labelledby={`${idPrefix}-gender-label`}>
+          <label className={`segment-option ${form.gender === 'male' ? 'is-active' : ''}`}>
+            <input
+              type="radio"
+              name={`${idPrefix}-gender`}
+              value="male"
+              checked={form.gender === 'male'}
+              onChange={(e) => setForm((prev) => ({ ...prev, gender: e.target.value }))}
+            />
+            남성
+          </label>
+          <label className={`segment-option ${form.gender === 'female' ? 'is-active' : ''}`}>
+            <input
+              type="radio"
+              name={`${idPrefix}-gender`}
+              value="female"
+              checked={form.gender === 'female'}
+              onChange={(e) => setForm((prev) => ({ ...prev, gender: e.target.value }))}
+            />
+            여성
+          </label>
+        </div>
+      </div>
+
+      <div className="field">
+        <span className="field-label" id={`${idPrefix}-calendar-label`}>
+          양력 / 음력
+        </span>
+        <div className="segment" role="group" aria-labelledby={`${idPrefix}-calendar-label`}>
+          <label className={`segment-option ${form.calendarType === 'solar' ? 'is-active' : ''}`}>
+            <input
+              type="radio"
+              name={`${idPrefix}-calendarType`}
+              value="solar"
+              checked={form.calendarType === 'solar'}
+              onChange={(e) => setForm((prev) => ({ ...prev, calendarType: e.target.value }))}
+            />
+            양력
+          </label>
+          <label className={`segment-option ${form.calendarType === 'lunar' ? 'is-active' : ''}`}>
+            <input
+              type="radio"
+              name={`${idPrefix}-calendarType`}
+              value="lunar"
+              checked={form.calendarType === 'lunar'}
+              onChange={(e) => setForm((prev) => ({ ...prev, calendarType: e.target.value }))}
+            />
+            음력
+          </label>
+        </div>
+      </div>
+    </>
+  )
+}
+
+function OnboardingModal({ initialName, onSave, saving, error }) {
+  const [form, setForm] = useState(() => emptyProfile({ name: initialName ?? '' }))
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!isProfileComplete(form)) return
+    await onSave(form)
+  }
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <div
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="onboarding-title"
+      >
+        <p className="modal-kicker">Welcome</p>
+        <h2 id="onboarding-title" className="modal-title">
+          생시 정보를 알려 주세요
+        </h2>
+        <p className="modal-lede">
+          처음 한 번만 입력하면, 다음부터는 저장된 정보로 사주를 봅니다.
+        </p>
+
+        <form className="form" onSubmit={handleSubmit}>
+          <ProfileFields form={form} setForm={setForm} idPrefix="onboarding" />
+          {error && <p className="error">{error}</p>}
+          <button type="submit" className="submit" disabled={saving || !isProfileComplete(form)}>
+            <span>{saving ? '저장 중' : '저장하고 시작하기'}</span>
+            {saving && <span className="submit-dots" aria-hidden="true" />}
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function ProfileView({ profile, onCancel, onSave, saving, error }) {
+  const [form, setForm] = useState(() => emptyProfile(profile))
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!isProfileComplete(form)) return
+    await onSave(form)
+  }
+
+  return (
+    <article className="result result-edit">
+      <div className="result-header">
+        <p className="result-kicker">Profile</p>
+        <button type="button" className="result-close" onClick={onCancel}>
+          닫기
+        </button>
+      </div>
+      <h2 className="result-title">내 정보</h2>
+      <p className="result-meta">이름과 생시는 사주 해석에 쓰입니다.</p>
+
+      <form className="form form-edit" onSubmit={handleSubmit}>
+        <ProfileFields form={form} setForm={setForm} idPrefix="profile" />
+        {error && <p className="error">{error}</p>}
+        <button type="submit" className="submit" disabled={saving || !isProfileComplete(form)}>
+          <span>{saving ? '저장 중' : '프로필 저장'}</span>
+          {saving && <span className="submit-dots" aria-hidden="true" />}
+        </button>
+      </form>
+    </article>
+  )
 }
 
 function ResultView({ reading, text, onClose, onEdit, onDelete, deleting }) {
@@ -87,15 +308,12 @@ function ResultView({ reading, text, onClose, onEdit, onDelete, deleting }) {
 }
 
 function EditReadingForm({ reading, onCancel, onSave, saving, error }) {
-  const [form, setForm] = useState(() => toEditForm(reading))
+  const [resultText, setResultText] = useState(reading.result ?? '')
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!form.name || !form.birthDate || !form.birthTime || !form.gender || !form.result.trim()) {
-      return
-    }
-    const age = getKoreanAge(form.birthDate)
-    await onSave({ ...form, age })
+    if (!resultText.trim()) return
+    await onSave(resultText.trim())
   }
 
   return (
@@ -106,102 +324,16 @@ function EditReadingForm({ reading, onCancel, onSave, saving, error }) {
           취소
         </button>
       </div>
-      <h2 className="result-title">기록 수정</h2>
+      <h2 className="result-title">해석 수정</h2>
 
       <form className="form form-edit" onSubmit={handleSubmit}>
-        <div className="field">
-          <label htmlFor="edit-name">이름</label>
-          <input
-            id="edit-name"
-            type="text"
-            value={form.name}
-            onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-            required
-          />
-        </div>
-
-        <div className="row">
-          <div className="field">
-            <label htmlFor="edit-birthDate">생년월일</label>
-            <input
-              id="edit-birthDate"
-              type="date"
-              value={form.birthDate}
-              onChange={(e) => setForm((prev) => ({ ...prev, birthDate: e.target.value }))}
-              required
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="edit-birthTime">태어난 시간</label>
-            <input
-              id="edit-birthTime"
-              type="time"
-              value={form.birthTime}
-              onChange={(e) => setForm((prev) => ({ ...prev, birthTime: e.target.value }))}
-              required
-            />
-          </div>
-        </div>
-
-        <div className="field">
-          <span className="field-label" id="edit-gender-label">성별</span>
-          <div className="segment" role="group" aria-labelledby="edit-gender-label">
-            <label className={`segment-option ${form.gender === 'male' ? 'is-active' : ''}`}>
-              <input
-                type="radio"
-                name="edit-gender"
-                value="male"
-                checked={form.gender === 'male'}
-                onChange={(e) => setForm((prev) => ({ ...prev, gender: e.target.value }))}
-              />
-              남성
-            </label>
-            <label className={`segment-option ${form.gender === 'female' ? 'is-active' : ''}`}>
-              <input
-                type="radio"
-                name="edit-gender"
-                value="female"
-                checked={form.gender === 'female'}
-                onChange={(e) => setForm((prev) => ({ ...prev, gender: e.target.value }))}
-              />
-              여성
-            </label>
-          </div>
-        </div>
-
-        <div className="field">
-          <span className="field-label" id="edit-calendar-label">양력 / 음력</span>
-          <div className="segment" role="group" aria-labelledby="edit-calendar-label">
-            <label className={`segment-option ${form.calendarType === 'solar' ? 'is-active' : ''}`}>
-              <input
-                type="radio"
-                name="edit-calendarType"
-                value="solar"
-                checked={form.calendarType === 'solar'}
-                onChange={(e) => setForm((prev) => ({ ...prev, calendarType: e.target.value }))}
-              />
-              양력
-            </label>
-            <label className={`segment-option ${form.calendarType === 'lunar' ? 'is-active' : ''}`}>
-              <input
-                type="radio"
-                name="edit-calendarType"
-                value="lunar"
-                checked={form.calendarType === 'lunar'}
-                onChange={(e) => setForm((prev) => ({ ...prev, calendarType: e.target.value }))}
-              />
-              음력
-            </label>
-          </div>
-        </div>
-
         <div className="field">
           <label htmlFor="edit-result">사주 해석</label>
           <textarea
             id="edit-result"
             className="field-textarea"
-            value={form.result}
-            onChange={(e) => setForm((prev) => ({ ...prev, result: e.target.value }))}
+            value={resultText}
+            onChange={(e) => setResultText(e.target.value)}
             rows={8}
             required
           />
@@ -260,26 +392,28 @@ function LoginView({ onSignIn, signingIn, error }) {
   )
 }
 
-function AuthBar({ user, onSignOut, signingOut }) {
-  const label = user.user_metadata?.full_name || user.email || '사용자'
+function AuthBar({ user, profileName, onOpenProfile, onSignOut, signingOut }) {
+  const label = profileName || user.user_metadata?.full_name || user.email || '사용자'
 
   return (
     <div className="auth-bar">
       <span className="auth-user">{label}</span>
-      <button type="button" className="auth-signout" onClick={onSignOut} disabled={signingOut}>
-        {signingOut ? '로그아웃 중' : '로그아웃'}
-      </button>
+      <div className="auth-actions">
+        {onOpenProfile && (
+          <button type="button" className="auth-signout" onClick={onOpenProfile}>
+            프로필
+          </button>
+        )}
+        <button type="button" className="auth-signout" onClick={onSignOut} disabled={signingOut}>
+          {signingOut ? '로그아웃 중' : '로그아웃'}
+        </button>
+      </div>
     </div>
   )
 }
 
 function App() {
-  const [name, setName] = useState('')
-  const [birthDate, setBirthDate] = useState('')
-  const [birthTime, setBirthTime] = useState('')
-  const [gender, setGender] = useState('')
-  const [calendarType, setCalendarType] = useState('solar')
-
+  const [profile, setProfile] = useState(emptyProfile())
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -288,8 +422,11 @@ function App() {
   const [readings, setReadings] = useState([])
   const [selectedReading, setSelectedReading] = useState(null)
   const [isEditing, setIsEditing] = useState(false)
+  const [isEditingProfile, setIsEditingProfile] = useState(false)
 
   const [user, setUser] = useState(null)
+  const [hasProfile, setHasProfile] = useState(false)
+  const [profileChecked, setProfileChecked] = useState(!isSupabaseConfigured)
   const [authReady, setAuthReady] = useState(!isSupabaseConfigured)
   const [signingIn, setSigningIn] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
@@ -347,11 +484,26 @@ function App() {
 
   useEffect(() => {
     if (user) {
-      loadReadings()
-    } else {
-      setReadings([])
+      loadUserData(user)
+      return
     }
+
+    setReadings([])
+    setHasProfile(false)
+    setProfileChecked(false)
+    setProfile(emptyProfile())
+    setIsEditingProfile(false)
   }, [user])
+
+  useEffect(() => {
+    const shouldLock = Boolean(user && profileChecked && !hasProfile)
+    if (!shouldLock) return undefined
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previous
+    }
+  }, [user, profileChecked, hasProfile])
 
   async function signInWithGoogle() {
     if (!supabase) return
@@ -389,12 +541,48 @@ function App() {
     setSigningOut(false)
   }
 
+  async function loadUserData(authUser) {
+    await Promise.all([loadProfile(authUser), loadReadings()])
+  }
+
+  async function loadProfile(authUser) {
+    if (!supabase) return
+
+    const { data, error: fetchError } = await supabase
+      .from('users')
+      .select(USER_FIELDS)
+      .eq('id', authUser.id)
+      .maybeSingle()
+
+    if (fetchError) {
+      console.error(fetchError)
+      setProfileChecked(true)
+      return
+    }
+
+    if (!data?.name || !data.birth_date || !data.birth_time || !data.gender) {
+      setHasProfile(false)
+      setProfile(
+        emptyProfile({
+          name: data?.name || authUser.user_metadata?.full_name || authUser.user_metadata?.name || '',
+        }),
+      )
+      setProfileChecked(true)
+      return
+    }
+
+    const nextProfile = profileFromRow(data)
+    setProfile(nextProfile)
+    setHasProfile(isProfileComplete(nextProfile))
+    setProfileChecked(true)
+  }
+
   async function loadReadings() {
     if (!supabase) return
 
     const { data, error: fetchError } = await supabase
       .from('saju_readings')
-      .select(READING_FIELDS)
+      .select(READING_SELECT)
       .order('created_at', { ascending: false })
 
     if (fetchError) {
@@ -402,14 +590,80 @@ function App() {
       return
     }
 
-    setReadings(data ?? [])
+    setReadings((data ?? []).map((row) => flattenReading(row)))
+  }
+
+  async function upsertProfile(nextProfile) {
+    const { error: upsertError } = await supabase.from('users').upsert({
+      id: user.id,
+      name: nextProfile.name,
+      birth_date: nextProfile.birthDate,
+      birth_time: nextProfile.birthTime,
+      gender: nextProfile.gender,
+      calendar_type: nextProfile.calendarType,
+      updated_at: new Date().toISOString(),
+    })
+
+    if (upsertError) {
+      throw new Error(upsertError.message)
+    }
+
+    setProfile(nextProfile)
+    setHasProfile(true)
+  }
+
+  function applyProfileToReadings(nextProfile) {
+    const snapshot = {
+      name: nextProfile.name,
+      birth_date: nextProfile.birthDate,
+      birth_time: nextProfile.birthTime,
+      gender: nextProfile.gender,
+      calendar_type: nextProfile.calendarType,
+    }
+    setReadings((prev) =>
+      prev.map((item) => ({
+        ...item,
+        ...snapshot,
+        age: getKoreanAge(nextProfile.birthDate),
+      })),
+    )
+    setSelectedReading((current) =>
+      current
+        ? { ...current, ...snapshot, age: getKoreanAge(nextProfile.birthDate) }
+        : current,
+    )
+  }
+
+  async function handleSaveProfile(nextProfile) {
+    if (!isProfileComplete(nextProfile)) {
+      setError('이름, 생년월일, 태어난 시간, 성별을 모두 입력해 주세요.')
+      return
+    }
+
+    setSaving(true)
+    setError('')
+
+    try {
+      if (supabase) {
+        await upsertProfile(nextProfile)
+      } else {
+        setProfile(nextProfile)
+        setHasProfile(true)
+      }
+      applyProfileToReadings(nextProfile)
+      setIsEditingProfile(false)
+    } catch (err) {
+      setError(err.message || '프로필 저장 중 오류가 발생했습니다.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function handleSubmit(e) {
     e.preventDefault()
 
-    if (!name || !birthDate || !birthTime || !gender) {
-      setError('이름, 생년월일, 태어난 시간, 성별을 모두 입력해 주세요.')
+    if (!isProfileComplete(profile)) {
+      setError('프로필 정보를 먼저 입력해 주세요.')
       return
     }
 
@@ -417,55 +671,52 @@ function App() {
     setResult('')
     setSelectedReading(null)
     setIsEditing(false)
+    setIsEditingProfile(false)
     setLoading(true)
 
     try {
-      const age = getKoreanAge(birthDate)
+      const age = getKoreanAge(profile.birthDate)
       const text = await interpretSaju({
-        name,
-        birthDate,
-        birthTime,
-        gender,
-        calendarType,
+        name: profile.name,
+        birthDate: profile.birthDate,
+        birthTime: profile.birthTime,
+        gender: profile.gender,
+        calendarType: profile.calendarType,
         age,
       })
 
+      const snapshot = {
+        name: profile.name,
+        birth_date: profile.birthDate,
+        birth_time: profile.birthTime,
+        gender: profile.gender,
+        calendar_type: profile.calendarType,
+        age,
+      }
+
       if (!supabase) {
         setResult(text)
-        setSelectedReading({
-          name,
-          birth_date: birthDate,
-          birth_time: birthTime,
-          gender,
-          calendar_type: calendarType,
-          age,
-          result: text,
-        })
+        setSelectedReading({ ...snapshot, result: text })
         return
       }
 
       const { data, error: insertError } = await supabase
         .from('saju_readings')
         .insert({
-          name,
-          birth_date: birthDate,
-          birth_time: birthTime,
-          gender,
-          calendar_type: calendarType,
-          age,
-          result: text,
           user_id: user.id,
+          result: text,
         })
-        .select(READING_FIELDS)
+        .select(READING_SELECT)
         .single()
 
       if (insertError) {
         throw new Error(insertError.message)
       }
 
+      const reading = flattenReading(data, snapshot)
       setResult(text)
-      setSelectedReading(data)
-      setReadings((prev) => [data, ...prev])
+      setSelectedReading(reading)
+      setReadings((prev) => [reading, ...prev])
     } catch (err) {
       setError(err.message || '사주 해석 중 오류가 발생했습니다.')
     } finally {
@@ -477,6 +728,7 @@ function App() {
     setSelectedReading(reading)
     setResult(reading.result)
     setIsEditing(false)
+    setIsEditingProfile(false)
     setError('')
     requestAnimationFrame(() => {
       document.getElementById('saju-result')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -496,7 +748,7 @@ function App() {
     setError('')
   }
 
-  async function handleSaveEdit(form) {
+  async function handleSaveEdit(resultText) {
     if (!supabase || !selectedReading?.id) return
 
     setSaving(true)
@@ -506,25 +758,26 @@ function App() {
       const { data, error: updateError } = await supabase
         .from('saju_readings')
         .update({
-          name: form.name,
-          birth_date: form.birthDate,
-          birth_time: form.birthTime,
-          gender: form.gender,
-          calendar_type: form.calendarType,
-          age: form.age,
-          result: form.result.trim(),
+          result: resultText,
         })
         .eq('id', selectedReading.id)
-        .select(READING_FIELDS)
+        .select(READING_SELECT)
         .single()
 
       if (updateError) {
         throw new Error(updateError.message)
       }
 
-      setSelectedReading(data)
-      setResult(data.result)
-      setReadings((prev) => prev.map((item) => (item.id === data.id ? data : item)))
+      const reading = flattenReading(data, {
+        name: profile.name,
+        birth_date: profile.birthDate,
+        birth_time: profile.birthTime,
+        gender: profile.gender,
+        calendar_type: profile.calendarType,
+      })
+      setSelectedReading(reading)
+      setResult(reading.result)
+      setReadings((prev) => prev.map((item) => (item.id === reading.id ? reading : item)))
       setIsEditing(false)
     } catch (err) {
       setError(err.message || '수정 중 오류가 발생했습니다.')
@@ -535,7 +788,7 @@ function App() {
 
   async function handleDeleteReading() {
     if (!supabase || !selectedReading?.id) return
-    if (!window.confirm(`${selectedReading.name} 기록을 삭제할까요?`)) return
+    if (!window.confirm('이 해석 기록을 삭제할까요?')) return
 
     setDeleting(true)
     setError('')
@@ -560,6 +813,15 @@ function App() {
   }
 
   const showResultPanel = result || isEditing
+  const showOnboarding = Boolean(user && profileChecked && !hasProfile)
+  const profileMeta = formatBirthMeta({
+    name: profile.name,
+    birth_date: profile.birthDate,
+    birth_time: profile.birthTime,
+    gender: profile.gender,
+    calendar_type: profile.calendarType,
+    age: profile.birthDate ? getKoreanAge(profile.birthDate) : null,
+  })
 
   if (isSupabaseConfigured && (!authReady || !user)) {
     return <LoginView onSignIn={signInWithGoogle} signingIn={signingIn} error={error} />
@@ -573,7 +835,7 @@ function App() {
         {readings.length === 0 ? (
           <p className="sidebar-empty">
             {isSupabaseConfigured
-              ? '아직 저장된 이름이 없습니다.'
+              ? '아직 저장된 해석이 없습니다.'
               : 'Supabase 환경변수가 없어 기록을 불러올 수 없습니다.'}
           </p>
         ) : (
@@ -585,7 +847,7 @@ function App() {
                   className={`reading-item ${selectedReading?.id === reading.id ? 'is-active' : ''}`}
                   onClick={() => handleSelectReading(reading)}
                 >
-                  {reading.name}
+                  {formatReadingDate(reading.created_at)}
                 </button>
               </li>
             ))}
@@ -594,8 +856,36 @@ function App() {
       </aside>
 
       <div className="page">
-        {user && <AuthBar user={user} onSignOut={signOut} signingOut={signingOut} />}
-        {showResultPanel ? (
+        {user && (
+          <AuthBar
+            user={user}
+            profileName={profile.name}
+            onOpenProfile={
+              hasProfile
+                ? () => {
+                    setIsEditingProfile(true)
+                    setIsEditing(false)
+                    setError('')
+                  }
+                : undefined
+            }
+            onSignOut={signOut}
+            signingOut={signingOut}
+          />
+        )}
+        {isEditingProfile ? (
+          <ProfileView
+            key={`${profile.name}-${profile.birthDate}-${profile.birthTime}`}
+            profile={profile}
+            onCancel={() => {
+              setIsEditingProfile(false)
+              setError('')
+            }}
+            onSave={handleSaveProfile}
+            saving={saving}
+            error={error}
+          />
+        ) : showResultPanel ? (
           <div id="saju-result">
             <header className="hero hero-compact">
               <p className="brand">saju-me</p>
@@ -629,103 +919,31 @@ function App() {
           <>
             <header className="hero">
               <p className="brand">saju-me</p>
-              <h1>당신의 사주를 읽어 드립니다</h1>
-              <p className="lede">이름과 생시만 알려 주세요. 차분하고 직설적인 해석을 전해 드립니다.</p>
+              <h1>{profile.name ? `${profile.name}님의 사주` : '당신의 사주를 읽어 드립니다'}</h1>
+              <p className="lede">저장된 생시로 해석합니다. 정보가 바뀌면 프로필에서 수정해 주세요.</p>
             </header>
 
             <main className="main">
+              {hasProfile && (
+                <section className="profile-card" aria-label="내 생시 정보">
+                  <p className="profile-card-kicker">Profile</p>
+                  <h2 className="profile-card-name">{profile.name}</h2>
+                  {profileMeta && <p className="profile-card-meta">{profileMeta}</p>}
+                  <button
+                    type="button"
+                    className="profile-card-edit"
+                    onClick={() => {
+                      setIsEditingProfile(true)
+                      setError('')
+                    }}
+                  >
+                    프로필 수정
+                  </button>
+                </section>
+              )}
+
               <form className="form" onSubmit={handleSubmit}>
-                <div className="field">
-                  <label htmlFor="name">이름</label>
-                  <input
-                    id="name"
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="홍길동"
-                    autoComplete="name"
-                  />
-                </div>
-
-                <div className="row">
-                  <div className="field">
-                    <label htmlFor="birthDate">생년월일</label>
-                    <input
-                      id="birthDate"
-                      type="date"
-                      value={birthDate}
-                      onChange={(e) => setBirthDate(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="field">
-                    <label htmlFor="birthTime">태어난 시간</label>
-                    <input
-                      id="birthTime"
-                      type="time"
-                      value={birthTime}
-                      onChange={(e) => setBirthTime(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div className="field">
-                  <span className="field-label" id="gender-label">
-                    성별
-                  </span>
-                  <div className="segment" role="group" aria-labelledby="gender-label">
-                    <label className={`segment-option ${gender === 'male' ? 'is-active' : ''}`}>
-                      <input
-                        type="radio"
-                        name="gender"
-                        value="male"
-                        checked={gender === 'male'}
-                        onChange={(e) => setGender(e.target.value)}
-                      />
-                      남성
-                    </label>
-                    <label className={`segment-option ${gender === 'female' ? 'is-active' : ''}`}>
-                      <input
-                        type="radio"
-                        name="gender"
-                        value="female"
-                        checked={gender === 'female'}
-                        onChange={(e) => setGender(e.target.value)}
-                      />
-                      여성
-                    </label>
-                  </div>
-                </div>
-
-                <div className="field">
-                  <span className="field-label" id="calendar-label">
-                    양력 / 음력
-                  </span>
-                  <div className="segment" role="group" aria-labelledby="calendar-label">
-                    <label className={`segment-option ${calendarType === 'solar' ? 'is-active' : ''}`}>
-                      <input
-                        type="radio"
-                        name="calendarType"
-                        value="solar"
-                        checked={calendarType === 'solar'}
-                        onChange={(e) => setCalendarType(e.target.value)}
-                      />
-                      양력
-                    </label>
-                    <label className={`segment-option ${calendarType === 'lunar' ? 'is-active' : ''}`}>
-                      <input
-                        type="radio"
-                        name="calendarType"
-                        value="lunar"
-                        checked={calendarType === 'lunar'}
-                        onChange={(e) => setCalendarType(e.target.value)}
-                      />
-                      음력
-                    </label>
-                  </div>
-                </div>
-
-                <button type="submit" className="submit" disabled={loading}>
+                <button type="submit" className="submit" disabled={loading || !hasProfile}>
                   <span>{loading ? '해석 중' : '사주 보기'}</span>
                   {loading && <span className="submit-dots" aria-hidden="true" />}
                 </button>
@@ -736,6 +954,17 @@ function App() {
           </>
         )}
       </div>
+
+      {showOnboarding && (
+        <OnboardingModal
+          initialName={
+            profile.name || user?.user_metadata?.full_name || user?.user_metadata?.name || ''
+          }
+          onSave={handleSaveProfile}
+          saving={saving}
+          error={error}
+        />
+      )}
     </div>
   )
 }
