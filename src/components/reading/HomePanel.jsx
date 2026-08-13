@@ -1,4 +1,5 @@
 import { mascotAnalyze } from '../../assets/mascot'
+import { READING_WAIT_PHRASES, useRotatingPhrase } from '../../hooks/useRotatingPhrase'
 import { Brand } from '../Brand'
 import { ProfileCard } from '../profile/ProfileCard'
 
@@ -11,6 +12,8 @@ export function HomePanel({
   onEditProfile,
   onSubmit,
 }) {
+  const waitPhrase = useRotatingPhrase(READING_WAIT_PHRASES, loading)
+
   return (
     <>
       <header className="hero">
@@ -26,8 +29,11 @@ export function HomePanel({
 
         <form className="form" onSubmit={onSubmit}>
           {loading && (
-            <div className="reading-wait" aria-hidden="true">
+            <div className="reading-wait" role="status" aria-live="polite">
               <img src={mascotAnalyze} alt="" className="mascot mascot-loading" />
+              <p className="reading-wait-text" key={waitPhrase}>
+                {waitPhrase}
+              </p>
             </div>
           )}
           <button
@@ -36,8 +42,7 @@ export function HomePanel({
             data-analytics="generate_reading"
             disabled={loading || !hasProfile}
           >
-            <span>{loading ? '해석 중' : '사주 보기'}</span>
-            {loading && <span className="submit-dots" aria-hidden="true" />}
+            <span>{loading ? '분석 중' : '사주 보기'}</span>
           </button>
         </form>
 
